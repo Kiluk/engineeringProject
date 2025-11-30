@@ -1,0 +1,16 @@
+{
+  "name": "engineeringProject",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Email keyword scanner prototype",
+  "main": "src/App.js",
+  "scripts": {
+    "start": "node ./scripts/test_api.js",
+    "test": "node ./scripts/test_api.js",
+    "expo-start": "npx expo start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}
