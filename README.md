@@ -1,2 +1,3 @@
 # engineeringProject
-My engineering project to pass studies
+
+Email keyword scanner and AI phishing detector (in development).
