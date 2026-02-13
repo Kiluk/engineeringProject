@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "phishing-detector",
+    "slug": "phishing-detector",
+    "version": "1.0.0",
+    "assetBundlePatterns": ["**/*"],
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "bundler": "metro"
+    },
+    "scheme": "phishing-detector"
+  }
+}
