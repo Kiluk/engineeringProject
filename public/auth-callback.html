@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gmail Auth Callback</title>
+</head>
+<body>
+  <p>Authenticating...</p>
+  <script>
+    // Extract token from URL hash
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+
+    if (accessToken) {
+      // Send token to parent window
+      if (window.opener) {
+        window.opener.postMessage(
+          { type: 'oauth_token', token: accessToken },
+          window.location.origin
+        );
+      }
+      document.body.innerHTML = '<p>✓ Authentication successful! You can close this window.</p>';
+    } else {
+      const error = params.get('error');
+      document.body.innerHTML = `<p>✗ Authentication failed: ${error || 'Unknown error'}</p>`;
+    }
+
+    // Close after 2 seconds
+    setTimeout(() => window.close(), 2000);
+  </script>
+</body>
+</html>

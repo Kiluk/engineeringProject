@@ -10,73 +10,31 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { PhishingDetector } from '../services/phishingDetector';
 import { GmailService } from '../services/gmailService';
+import { PhishingDetector } from '../services/phishingDetector';
 import EmailCard from '../components/EmailCard';
 
-const MOCK_EMAILS = [
-  {
-    id: '1',
-    from: 'support@paypal.com',
-    subject: 'Verify Your PayPal Account Immediately',
-    snippet: 'Click here to confirm your account details to avoid suspension...',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: '2',
-    from: 'notifications@amazon.com',
-    subject: 'Your Amazon Package Delivery Code',
-    snippet: 'Your package has arrived. Use code 12345 to claim it.',
-    timestamp: new Date(Date.now() - 7200000).toISOString(),
-  },
-  {
-    id: '3',
-    from: 'noreply@apple.com',
-    subject: 'Apple ID Locked - Update Required',
-    snippet: 'Your Apple ID has been locked due to suspicious activity. Click immediately...',
-    timestamp: new Date(Date.now() - 10800000).toISOString(),
-  },
-  {
-    id: '4',
-    from: 'hr@company.com',
-    subject: 'Team Lunch Tomorrow at 12 PM',
-    snippet: 'Join us for our monthly team lunch. RSVP by end of day.',
-    timestamp: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
-
-export default function HomeScreen() {
-  const [emails, setEmails] = useState(MOCK_EMAILS);
+export default function HomeScreen({ onLogout }) {
+  const [emails, setEmails] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [showApiInput, setShowApiInput] = useState(true);
-  const [analysis, setAnalysis] = useState({}); // { emailId: { isPhishing, confidence, reason } }
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [loadingEmails, setLoadingEmails] = useState(false);
+  const [analysis, setAnalysis] = useState({});
 
-  const handleConnectGmail = async () => {
-    try {
-      const res = await GmailService.connect();
-      if (res.success) {
-        setGmailConnected(true);
-        fetchGmailEmails();
-      } else {
-        Alert.alert('Connection failed', res.error || 'Unknown error');
-      }
-    } catch (err) {
-      Alert.alert('Error', err.message);
-    }
-  };
+  useEffect(() => {
+    fetchEmails();
+  }, []);
 
-  const fetchGmailEmails = async () => {
-    setLoadingEmails(true);
+  const fetchEmails = async () => {
+    setLoading(true);
     try {
-      const realEmails = await GmailService.fetchRecentEmails(20);
-      setEmails(realEmails);
+      const emails = await GmailService.fetchRecentEmails(20);
+      setEmails(emails);
     } catch (err) {
-      Alert.alert('Fetch failed', err.message);
+      Alert.alert('Error', 'Failed to fetch emails: ' + err.message);
     } finally {
-      setLoadingEmails(false);
+      setLoading(false);
     }
   };
 
@@ -92,8 +50,7 @@ export default function HomeScreen() {
       const results = await PhishingDetector.analyzeMultiple(emails);
       setAnalysis(results);
       setShowApiInput(false);
-      
-      // Count phishing emails
+
       const phishingCount = Object.values(results).filter(r => r.isPhishing).length;
       Alert.alert(
         'Analysis Complete',
@@ -107,8 +64,8 @@ export default function HomeScreen() {
   };
 
   const handleFlagEmail = (emailId) => {
-    setEmails(emails.map(email => 
-      email.id === emailId 
+    setEmails(emails.map(email =>
+      email.id === emailId
         ? { ...email, flagged: !email.flagged }
         : email
     ));
@@ -123,19 +80,18 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>🛡️ Phishing Detector</Text>
-        <Text style={styles.subtitle}>AI-powered email security</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>🛡️ Phishing Detector</Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+            <Text style={styles.logoutText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.subtitle}>Your Gmail emails</Text>
       </View>
-
-      {!gmailConnected && (
-        <TouchableOpacity style={styles.connectButton} onPress={handleConnectGmail} disabled={loadingEmails}>
-          <Text style={styles.connectText}>{loadingEmails ? 'Connecting...' : 'Connect Gmail'}</Text>
-        </TouchableOpacity>
-      )}
 
       {showApiInput && (
         <View style={styles.apiSection}>
-          <Text style={styles.sectionTitle}>Anthropic API Key</Text>
+          <Text style={styles.sectionTitle}>Analyze with AI</Text>
           <TextInput
             style={styles.input}
             placeholder="sk-ant-..."
@@ -167,8 +123,12 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {loadingEmails ? (
-        <ActivityIndicator style={{ marginTop: 20 }} />
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} size="large" />
+      ) : emails.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>No emails found</Text>
+        </View>
       ) : (
         <FlatList
           scrollEnabled={false}
@@ -198,13 +158,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     padding: 20,
     paddingTop: 40,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 5,
+  },
+  logoutButton: {
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   subtitle: {
     fontSize: 14,
@@ -265,5 +240,16 @@ const styles = StyleSheet.create({
   emailList: {
     paddingHorizontal: 15,
     paddingVertical: 10,
+  },
+  emptyBox: {
+    margin: 15,
+    padding: 40,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#666',
   },
 });
