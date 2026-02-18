@@ -31,10 +31,11 @@ npm run web
 This will start the Expo web server and open your browser. 
 
 The app will:
-1. Show a list of mock emails
-2. Ask for your Anthropic API key
-3. Analyze each email using Claude
-4. Display phishing detection results with confidence scores
+1. Show a list of mock emails (or later your real Gmail messages)
+2. Click **Connect Gmail** and grant permission to read your inbox
+3. Input your Anthropic API key
+4. Analyze each email using Claude
+5. Display phishing detection results with confidence scores
 
 ### Future: Running on Mobile
 
