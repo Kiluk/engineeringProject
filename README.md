@@ -69,7 +69,7 @@ src/
 
 ## Next Steps
 
-- [ ] Real Gmail API integration (OAuth)
+- [x] Real Gmail API integration (OAuth) - currently connects and fetches recent messages from your account
 - [ ] Email threading/conversations
 - [ ] Custom phishing rules
 - [ ] Mobile UI refinements

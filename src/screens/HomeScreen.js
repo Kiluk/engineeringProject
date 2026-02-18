@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { PhishingDetector } from '../services/phishingDetector';
+import { GmailService } from '../services/gmailService';
 import EmailCard from '../components/EmailCard';
 
 const MOCK_EMAILS = [
@@ -50,6 +51,34 @@ export default function HomeScreen() {
   const [apiKey, setApiKey] = useState('');
   const [showApiInput, setShowApiInput] = useState(true);
   const [analysis, setAnalysis] = useState({}); // { emailId: { isPhishing, confidence, reason } }
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+
+  const handleConnectGmail = async () => {
+    try {
+      const res = await GmailService.connect();
+      if (res.success) {
+        setGmailConnected(true);
+        fetchGmailEmails();
+      } else {
+        Alert.alert('Connection failed', res.error || 'Unknown error');
+      }
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    }
+  };
+
+  const fetchGmailEmails = async () => {
+    setLoadingEmails(true);
+    try {
+      const realEmails = await GmailService.fetchRecentEmails(20);
+      setEmails(realEmails);
+    } catch (err) {
+      Alert.alert('Fetch failed', err.message);
+    } finally {
+      setLoadingEmails(false);
+    }
+  };
 
   const handleAnalyzeAll = async () => {
     if (!apiKey.trim()) {
@@ -98,6 +127,12 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>AI-powered email security</Text>
       </View>
 
+      {!gmailConnected && (
+        <TouchableOpacity style={styles.connectButton} onPress={handleConnectGmail} disabled={loadingEmails}>
+          <Text style={styles.connectText}>{loadingEmails ? 'Connecting...' : 'Connect Gmail'}</Text>
+        </TouchableOpacity>
+      )}
+
       {showApiInput && (
         <View style={styles.apiSection}>
           <Text style={styles.sectionTitle}>Anthropic API Key</Text>
@@ -132,20 +167,24 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <FlatList
-        scrollEnabled={false}
-        data={emails}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <EmailCard
-            email={item}
-            analysis={analysis[item.id]}
-            onFlag={handleFlagEmail}
-            flagged={item.flagged}
-          />
-        )}
-        style={styles.emailList}
-      />
+      {loadingEmails ? (
+        <ActivityIndicator style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          scrollEnabled={false}
+          data={emails}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <EmailCard
+              email={item}
+              analysis={analysis[item.id]}
+              onFlag={handleFlagEmail}
+              flagged={item.flagged}
+            />
+          )}
+          style={styles.emailList}
+        />
+      )}
     </ScrollView>
   );
 }
