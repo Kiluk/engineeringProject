@@ -53,7 +53,9 @@ npm run ios      # iOS device/simulator
 
 ## API Key Security
 
-The API key is entered at runtime and stored only in the app's memory (not persisted to disk).
+The API key is entered once in the app and saved securely in local storage (AsyncStorage) on the device/browser. You won't need to type it again on subsequent launches — the app will automatically reuse the saved key. To change the key, click **Change API Key** on the home screen.
+
+> ⚠️ This is convenient for testing but treat your real key carefully; don't ship it in a public build.
 
 ## Project Structure
 

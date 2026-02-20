@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GmailService } from '../services/gmailService';
 import { PhishingDetector } from '../services/phishingDetector';
 import EmailCard from '../components/EmailCard';
@@ -21,9 +22,24 @@ export default function HomeScreen({ onLogout }) {
   const [apiKey, setApiKey] = useState('');
   const [showApiInput, setShowApiInput] = useState(true);
   const [analysis, setAnalysis] = useState({});
+  const API_KEY_STORAGE = '@anthropic_api_key';
 
   useEffect(() => {
     fetchEmails();
+
+    // try to load saved key from storage
+    const loadKey = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(API_KEY_STORAGE);
+        if (stored) {
+          setApiKey(stored);
+          setShowApiInput(false);
+        }
+      } catch (e) {
+        console.warn('Failed to load API key', e);
+      }
+    };
+    loadKey();
   }, []);
 
   const fetchEmails = async () => {
@@ -42,6 +58,13 @@ export default function HomeScreen({ onLogout }) {
     if (!apiKey.trim()) {
       Alert.alert('Missing API Key', 'Please enter your Anthropic API key');
       return;
+    }
+
+    // persist key for future sessions
+    try {
+      await AsyncStorage.setItem(API_KEY_STORAGE, apiKey);
+    } catch (e) {
+      console.warn('Unable to save API key', e);
     }
 
     setAnalyzing(true);
@@ -110,6 +133,21 @@ export default function HomeScreen({ onLogout }) {
             ) : (
               <Text style={styles.buttonText}>Analyze All Emails</Text>
             )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!showApiInput && (
+        <View style={styles.changeKeySection}>
+          <TouchableOpacity
+            onPress={async () => {
+              await AsyncStorage.removeItem(API_KEY_STORAGE);
+              setApiKey('');
+              setShowApiInput(true);
+              setAnalysis({});
+            }}
+          >
+            <Text style={styles.resetLink}>Change API Key</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -236,6 +274,10 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     fontSize: 13,
     fontWeight: '500',
+  },
+  changeKeySection: {
+    marginTop: 10,
+    alignItems: 'center',
   },
   emailList: {
     paddingHorizontal: 15,
