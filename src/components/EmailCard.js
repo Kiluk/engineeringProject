@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { SenderAnalyzer } from '../services/senderAnalyzer';
 
 export default function EmailCard({ email, analysis, onFlag, flagged }) {
+  const senderAnalysis = SenderAnalyzer.analyzeSender(email.from);
   const handleFlag = () => {
     Alert.alert(
       flagged ? 'Unflag Email' : 'Flag Email',
@@ -39,7 +41,7 @@ export default function EmailCard({ email, analysis, onFlag, flagged }) {
             {email.from}
           </Text>
           <Text style={styles.timestamp}>
-            {new Date(email.timestamp).toLocaleDateString()}
+            {new Date(email.timestamp).toLocaleDateString()} • Trust: {senderAnalysis.trustScore}%
           </Text>
         </View>
         <TouchableOpacity
@@ -57,6 +59,19 @@ export default function EmailCard({ email, analysis, onFlag, flagged }) {
       <Text style={styles.snippet} numberOfLines={2}>
         {email.snippet}
       </Text>
+
+      {senderAnalysis.riskLevel !== 'low' && (
+        <View style={[styles.senderWarning, styles[`risk${senderAnalysis.riskLevel}`]]}>
+          <Text style={styles.warningTitle}>
+            {senderAnalysis.riskLevel === 'high' ? '⚠️ HIGH RISK SENDER' : '⚡ MEDIUM RISK SENDER'}
+          </Text>
+          {senderAnalysis.warnings.map((warning, idx) => (
+            <Text key={idx} style={styles.warningText}>
+              • {warning}
+            </Text>
+          ))}
+        </View>
+      )}
 
       {analysis && (
         <View
@@ -180,5 +195,31 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     marginTop: 4,
+  },
+  senderWarning: {
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+  },
+  riskhigh: {
+    backgroundColor: '#fef2f2',
+    borderLeftColor: '#dc2626',
+  },
+  riskmedium: {
+    backgroundColor: '#fff7ed',
+    borderLeftColor: '#f97316',
+  },
+  warningTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+    color: '#1a1a1a',
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+    lineHeight: 16,
   },
 });
