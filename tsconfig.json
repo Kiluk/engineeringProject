@@ -1,0 +1,18 @@
+{
+  "extends": "expo-module-scripts/tsconfig.base",
+  "compilerOptions": {
+    "allowJs": true,
+    "jsx": "react-native",
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".expo",
+    "babel.config.js",
+    "metro.config.js",
+    "jest.config.js"
+  ]
+}
