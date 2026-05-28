@@ -10,9 +10,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GmailService } from '../services/gmailService';
-import { PhishingDetector } from '../services/phishingDetector';
+import { EmailManager } from '../services/emailManager';
 import EmailCard from '../components/EmailCard';
 
 export default function HomeScreen({ onLogout }) {
@@ -22,15 +20,14 @@ export default function HomeScreen({ onLogout }) {
   const [apiKey, setApiKey] = useState('');
   const [showApiInput, setShowApiInput] = useState(true);
   const [analysis, setAnalysis] = useState({});
-  const API_KEY_STORAGE = '@anthropic_api_key';
+  const [selectedEmail, setSelectedEmail] = useState(null);
 
   useEffect(() => {
     fetchEmails();
 
-    // try to load saved key from storage
     const loadKey = async () => {
       try {
-        const stored = await AsyncStorage.getItem(API_KEY_STORAGE);
+        const stored = await EmailManager.loadSavedApiKey();
         if (stored) {
           setApiKey(stored);
           setShowApiInput(false);
@@ -45,8 +42,8 @@ export default function HomeScreen({ onLogout }) {
   const fetchEmails = async () => {
     setLoading(true);
     try {
-      const emails = await GmailService.fetchRecentEmails(20);
-      setEmails(emails);
+      const inbox = await EmailManager.fetchEmails(20);
+      setEmails(inbox);
     } catch (err) {
       Alert.alert('Error', 'Failed to fetch emails: ' + err.message);
     } finally {
@@ -54,35 +51,42 @@ export default function HomeScreen({ onLogout }) {
     }
   };
 
-  const handleAnalyzeAll = async () => {
+  const handleAnalyzeEmail = async (email) => {
     if (!apiKey.trim()) {
       Alert.alert('Missing API Key', 'Please enter your Anthropic API key');
       return;
     }
 
-    // persist key for future sessions
-    try {
-      await AsyncStorage.setItem(API_KEY_STORAGE, apiKey);
-    } catch (e) {
-      console.warn('Unable to save API key', e);
-    }
-
     setAnalyzing(true);
     try {
-      PhishingDetector.setApiKey(apiKey);
-      const results = await PhishingDetector.analyzeMultiple(emails);
-      setAnalysis(results);
+      const result = await EmailManager.analyzeEmail(email, apiKey);
+      setAnalysis((prev) => ({ ...prev, [email.id]: result }));
+      setSelectedEmail(email);
       setShowApiInput(false);
-
-      const phishingCount = Object.values(results).filter(r => r.isPhishing).length;
-      Alert.alert(
-        'Analysis Complete',
-        `Analyzed ${emails.length} emails\n${phishingCount} potential phishing detected`
-      );
+      Alert.alert('Analysis Complete', `Email analysis finished for: ${email.subject}`);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to analyze emails');
+      Alert.alert('Error', error.message || 'Failed to analyze email');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleSelectEmail = (email) => {
+    setSelectedEmail(email);
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKey.trim()) {
+      Alert.alert('Missing API Key', 'Please enter your Anthropic API key');
+      return;
+    }
+
+    try {
+      await EmailManager.saveApiKey(apiKey);
+      setShowApiInput(false);
+      Alert.alert('Ready', 'API key saved. Select a message to analyze.');
+    } catch (error) {
+      Alert.alert('Error', 'Unable to save API key');
     }
   };
 
@@ -92,12 +96,6 @@ export default function HomeScreen({ onLogout }) {
         ? { ...email, flagged: !email.flagged }
         : email
     ));
-  };
-
-  const handleReset = () => {
-    setAnalysis({});
-    setShowApiInput(true);
-    setApiKey('');
   };
 
   return (
@@ -125,13 +123,13 @@ export default function HomeScreen({ onLogout }) {
           />
           <TouchableOpacity
             style={[styles.button, analyzing && styles.buttonDisabled]}
-            onPress={handleAnalyzeAll}
+            onPress={handleSaveApiKey}
             disabled={analyzing}
           >
             {analyzing ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Analyze All Emails</Text>
+              <Text style={styles.buttonText}>Save API Key</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -141,10 +139,11 @@ export default function HomeScreen({ onLogout }) {
         <View style={styles.changeKeySection}>
           <TouchableOpacity
             onPress={async () => {
-              await AsyncStorage.removeItem(API_KEY_STORAGE);
+              await EmailManager.clearSavedApiKey();
               setApiKey('');
               setShowApiInput(true);
               setAnalysis({});
+              setSelectedEmail(null);
             }}
           >
             <Text style={styles.resetLink}>Change API Key</Text>
@@ -152,12 +151,35 @@ export default function HomeScreen({ onLogout }) {
         </View>
       )}
 
-      {Object.keys(analysis).length > 0 && (
-        <View style={styles.resultsHeader}>
-          <Text style={styles.sectionTitle}>Analysis Results</Text>
-          <TouchableOpacity onPress={handleReset}>
-            <Text style={styles.resetLink}>Analyze Again</Text>
-          </TouchableOpacity>
+      {selectedEmail && (
+        <View style={styles.detailsSection}>
+          <Text style={styles.sectionTitle}>Selected Email</Text>
+          <Text style={styles.detailLabel}>From</Text>
+          <Text style={styles.detailText}>{selectedEmail.from}</Text>
+          <Text style={styles.detailLabel}>Subject</Text>
+          <Text style={styles.detailText}>{selectedEmail.subject}</Text>
+          <Text style={styles.detailLabel}>Message preview</Text>
+          <Text style={styles.bodyText}>{selectedEmail.body || selectedEmail.snippet || 'No message body available'}</Text>
+          {analysis[selectedEmail.id] ? (
+            <View style={styles.detailsAnalysisBox}>
+              <Text style={styles.detailLabel}>AI Analysis Result</Text>
+              <Text style={styles.analysisDetailText}>{analysis[selectedEmail.id].reason}</Text>
+              <Text style={styles.analysisDetailText}>
+                Verdict: {analysis[selectedEmail.id].isPhishing ? 'Phishing' : 'Safe'}
+              </Text>
+              <Text style={styles.analysisDetailText}>
+                Confidence: {(analysis[selectedEmail.id].confidence * 100).toFixed(0)}%
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.button, analyzing && styles.buttonDisabled]}
+              onPress={() => handleAnalyzeEmail(selectedEmail)}
+              disabled={analyzing}
+            >
+              {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Analyze Selected Email</Text>}
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -178,6 +200,8 @@ export default function HomeScreen({ onLogout }) {
               analysis={analysis[item.id]}
               onFlag={handleFlagEmail}
               flagged={item.flagged}
+              onAnalyze={handleAnalyzeEmail}
+              onSelect={handleSelectEmail}
             />
           )}
           style={styles.emailList}
@@ -293,5 +317,49 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: '#666',
+  },
+  detailsSection: {
+    marginHorizontal: 15,
+    marginBottom: 15,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  detailLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginTop: 10,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#444',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  bodyText: {
+    fontSize: 13,
+    color: '#444',
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  detailsAnalysisBox: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  analysisDetailText: {
+    fontSize: 12,
+    color: '#333',
+    marginTop: 4,
+    lineHeight: 18,
   },
 });

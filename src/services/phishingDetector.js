@@ -14,6 +14,7 @@ export const PhishingDetector = {
       throw new Error('API key not set. Call setApiKey() first.');
     }
 
+    const emailBody = email.body || email.snippet || '';
     const prompt = `Analyze this email for phishing indicators. Return a JSON response with these exact fields:
 {
   "isPhishing": boolean,
@@ -24,7 +25,7 @@ export const PhishingDetector = {
 Email details:
 From: ${email.from}
 Subject: ${email.subject}
-Body: ${email.snippet}
+Body: ${emailBody}
 
 Focus on:
 - Unusual sender domain vs claimed company

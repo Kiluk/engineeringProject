@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SenderAnalyzer } from '../services/senderAnalyzer';
 
-export default function EmailCard({ email, analysis, onFlag, flagged }) {
+export default function EmailCard({ email, analysis, onFlag, flagged, onAnalyze, onSelect }) {
   const senderAnalysis = SenderAnalyzer.analyzeSender(email.from);
   const handleFlag = () => {
     Alert.alert(
@@ -73,6 +73,16 @@ export default function EmailCard({ email, analysis, onFlag, flagged }) {
         </View>
       )}
 
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => onAnalyze?.(email)}>
+          <Text style={styles.actionText}>
+            {analysis ? 'Re-run Analysis' : 'Analyze email'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.detailsButton} onPress={() => onSelect?.(email)}>
+          <Text style={styles.detailsText}>View details</Text>
+        </TouchableOpacity>
+      </View>
       {analysis && (
         <View
           style={[
@@ -221,5 +231,32 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 4,
     lineHeight: 16,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  actionButton: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  actionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  detailsButton: {
+    backgroundColor: '#e5e7eb',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  detailsText: {
+    color: '#111827',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

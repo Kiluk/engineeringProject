@@ -7,6 +7,17 @@ const TOKEN_KEY = '@gmail_access_token';
 
 let accessToken = null;
 
+const decodeBase64 = (input) => {
+  try {
+    const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+    return decodeURIComponent(Array.prototype.map.call(atob(normalized), (c) => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+  } catch (err) {
+    return input;
+  }
+};
+
 // Handle OAuth redirect in popup window
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
   const hash = window.location.hash.substring(1);
@@ -146,7 +157,7 @@ export const GmailService = {
       for (const msg of listData.messages) {
         try {
           const msgResp = await fetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
             { headers: { Authorization: `Bearer ${accessToken}` } }
           );
 
@@ -157,11 +168,15 @@ export const GmailService = {
           const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
           const subject = headers.find(h => h.name === 'Subject')?.value || '(no subject)';
 
+          const bodyPart = msgData.payload?.parts?.find(part => part.mimeType === 'text/plain')?.body?.data;
+          const body = bodyPart ? decodeBase64(bodyPart) : msgData.snippet || '';
+
           emails.push({
             id: msg.id,
             from,
             subject,
             snippet: msgData.snippet || '',
+            body,
             timestamp: new Date(parseInt(msgData.internalDate, 10)).toISOString(),
           });
         } catch (err) {
