@@ -2,6 +2,8 @@
 
 AI-powered email security using Claude API to detect phishing attempts.
 
+**Repozytorium:** https://github.com/Kiluk/engineeringProject
+
 ## Features
 
 - 🤖 Claude AI phishing detection
