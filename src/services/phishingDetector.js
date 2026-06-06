@@ -9,6 +9,16 @@ export const PhishingDetector = {
     client = new Anthropic({ apiKey: key });
   },
 
+  setClient: (mockClient) => {
+    client = mockClient;
+    apiKey = mockClient ? 'test' : '';
+  },
+
+  reset: () => {
+    apiKey = '';
+    client = null;
+  },
+
   detectPhishing: async (email) => {
     if (!client) {
       throw new Error('API key not set. Call setApiKey() first.');
