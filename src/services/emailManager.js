@@ -3,6 +3,7 @@ import { GmailService } from './gmailService';
 import { PhishingDetector } from './phishingDetector';
 
 const API_KEY_STORAGE = '@anthropic_api_key';
+const ANALYSIS_STORAGE = '@email_analysis_results';
 
 export const EmailManager = {
   loadSavedApiKey: async () => {
@@ -23,6 +24,26 @@ export const EmailManager = {
     }
   },
 
+  loadSavedAnalysis: async () => {
+    try {
+      const stored = await AsyncStorage.getItem(ANALYSIS_STORAGE);
+      return stored ? JSON.parse(stored) : {};
+    } catch (error) {
+      console.warn('EmailManager: failed to load saved analysis', error);
+      return {};
+    }
+  },
+
+  saveAnalysis: async (emailId, analysis) => {
+    try {
+      const stored = await EmailManager.loadSavedAnalysis();
+      const updated = { ...stored, [emailId]: analysis };
+      await AsyncStorage.setItem(ANALYSIS_STORAGE, JSON.stringify(updated));
+    } catch (error) {
+      console.warn('EmailManager: failed to save analysis', error);
+    }
+  },
+
   clearSavedApiKey: async () => {
     try {
       await AsyncStorage.removeItem(API_KEY_STORAGE);
@@ -36,12 +57,15 @@ export const EmailManager = {
   },
 
   analyzeEmail: async (email, key) => {
-    if (!key || !key.trim()) {
+    const effectiveKey = key && key.trim() ? key : await EmailManager.loadSavedApiKey();
+    if (!effectiveKey || !effectiveKey.trim()) {
       throw new Error('Missing API key');
     }
 
-    await EmailManager.saveApiKey(key);
-    PhishingDetector.setApiKey(key);
-    return PhishingDetector.detectPhishing(email);
+    await EmailManager.saveApiKey(effectiveKey);
+    PhishingDetector.setApiKey(effectiveKey);
+    const result = await PhishingDetector.detectPhishing(email);
+    await EmailManager.saveAnalysis(email.id, result);
+    return result;
   },
 };

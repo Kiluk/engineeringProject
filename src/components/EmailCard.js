@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { SenderAnalyzer } from '../services/senderAnalyzer';
 
@@ -41,7 +42,10 @@ export default function EmailCard({ email, analysis, onFlag, flagged, onAnalyze,
             {email.from}
           </Text>
           <Text style={styles.timestamp}>
-            {new Date(email.timestamp).toLocaleDateString()} • Trust: {senderAnalysis.trustScore}%
+            {new Date(email.timestamp).toLocaleDateString()}
+          </Text>
+          <Text style={styles.senderRating}>
+            Ocena nadawcy: {senderAnalysis.trustScore}% • {senderAnalysis.riskLevel === 'high' ? 'Wysokie ryzyko' : senderAnalysis.riskLevel === 'medium' ? 'Średnie ryzyko' : 'Niskie ryzyko'}
           </Text>
         </View>
         <TouchableOpacity
@@ -56,22 +60,48 @@ export default function EmailCard({ email, analysis, onFlag, flagged, onAnalyze,
         {email.subject}
       </Text>
 
-      <Text style={styles.snippet} numberOfLines={2}>
-        {email.snippet}
-      </Text>
+      <View style={styles.cardScrollContainer}>
+        <ScrollView nestedScrollEnabled style={styles.cardScrollContent}>
+          <Text style={styles.snippet}>{email.snippet}</Text>
 
-      {senderAnalysis.riskLevel !== 'low' && (
-        <View style={[styles.senderWarning, styles[`risk${senderAnalysis.riskLevel}`]]}>
-          <Text style={styles.warningTitle}>
-            {senderAnalysis.riskLevel === 'high' ? '⚠️ HIGH RISK SENDER' : '⚡ MEDIUM RISK SENDER'}
-          </Text>
-          {senderAnalysis.warnings.map((warning, idx) => (
-            <Text key={idx} style={styles.warningText}>
-              • {warning}
-            </Text>
-          ))}
-        </View>
-      )}
+          {senderAnalysis.riskLevel !== 'low' && (
+            <View style={[styles.senderWarning, styles[`risk${senderAnalysis.riskLevel}`]]}>
+              <Text style={styles.warningTitle}>
+                {senderAnalysis.riskLevel === 'high' ? '⚠️ HIGH RISK SENDER' : '⚡ MEDIUM RISK SENDER'}
+              </Text>
+              {senderAnalysis.warnings.map((warning, idx) => (
+                <Text key={idx} style={styles.warningText}>
+                  • {warning}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {analysis && (
+            <View
+              style={[
+                styles.analysisBox,
+                isPhishing ? styles.phishingBox : styles.legitBox,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.verdict,
+                  isPhishing ? styles.phishingText : styles.legitText,
+                ]}
+              >
+                {isPhishing ? '⚠️ Likely Phishing' : '✅ Likely Legitimate'}
+              </Text>
+              <Text style={styles.confidence}>
+                Confidence: {(confidence * 100).toFixed(0)}%
+              </Text>
+              {analysis.reason && (
+                <Text style={styles.reason}>{analysis.reason}</Text>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </View>
 
       <View style={styles.actionRow}>
         <TouchableOpacity style={styles.actionButton} onPress={() => onAnalyze?.(email)}>
@@ -83,29 +113,6 @@ export default function EmailCard({ email, analysis, onFlag, flagged, onAnalyze,
           <Text style={styles.detailsText}>View details</Text>
         </TouchableOpacity>
       </View>
-      {analysis && (
-        <View
-          style={[
-            styles.analysisBox,
-            isPhishing ? styles.phishingBox : styles.legitBox,
-          ]}
-        >
-          <Text
-            style={[
-              styles.verdict,
-              isPhishing ? styles.phishingText : styles.legitText,
-            ]}
-          >
-            {isPhishing ? '⚠️ Likely Phishing' : '✅ Likely Legitimate'}
-          </Text>
-          <Text style={styles.confidence}>
-            Confidence: {(confidence * 100).toFixed(0)}%
-          </Text>
-          {analysis.reason && (
-            <Text style={styles.reason}>{analysis.reason}</Text>
-          )}
-        </View>
-      )}
     </View>
   );
 }
@@ -171,6 +178,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 10,
   },
+  cardScrollContainer: {
+    maxHeight: 180,
+    marginBottom: 10,
+  },
+  cardScrollContent: {
+    paddingRight: 10,
+  },
   analysisBox: {
     borderRadius: 6,
     padding: 10,
@@ -204,6 +218,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
     fontStyle: 'italic',
+    marginTop: 4,
+  },
+  senderRating: {
+    fontSize: 12,
+    color: '#444',
     marginTop: 4,
   },
   senderWarning: {

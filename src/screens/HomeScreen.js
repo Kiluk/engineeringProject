@@ -6,11 +6,11 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
   TextInput,
   Alert,
 } from 'react-native';
 import { EmailManager } from '../services/emailManager';
+import { SenderAnalyzer } from '../services/senderAnalyzer';
 import EmailCard from '../components/EmailCard';
 
 export default function HomeScreen({ onLogout }) {
@@ -21,22 +21,27 @@ export default function HomeScreen({ onLogout }) {
   const [showApiInput, setShowApiInput] = useState(true);
   const [analysis, setAnalysis] = useState({});
   const [selectedEmail, setSelectedEmail] = useState(null);
+  const selectedSenderAnalysis = selectedEmail ? SenderAnalyzer.analyzeSender(selectedEmail.from) : null;
 
   useEffect(() => {
     fetchEmails();
 
-    const loadKey = async () => {
+    const loadState = async () => {
       try {
         const stored = await EmailManager.loadSavedApiKey();
         if (stored) {
           setApiKey(stored);
           setShowApiInput(false);
         }
+        const savedAnalysis = await EmailManager.loadSavedAnalysis();
+        if (savedAnalysis) {
+          setAnalysis(savedAnalysis);
+        }
       } catch (e) {
-        console.warn('Failed to load API key', e);
+        console.warn('Failed to load API key or saved analysis', e);
       }
     };
-    loadKey();
+    loadState();
   }, []);
 
   const fetchEmails = async () => {
@@ -52,16 +57,22 @@ export default function HomeScreen({ onLogout }) {
   };
 
   const handleAnalyzeEmail = async (email) => {
-    if (!apiKey.trim()) {
+    let keyToUse = apiKey;
+    if (!keyToUse.trim()) {
+      keyToUse = await EmailManager.loadSavedApiKey();
+    }
+
+    if (!keyToUse || !keyToUse.trim()) {
       Alert.alert('Missing API Key', 'Please enter your Anthropic API key');
       return;
     }
 
     setAnalyzing(true);
     try {
-      const result = await EmailManager.analyzeEmail(email, apiKey);
+      const result = await EmailManager.analyzeEmail(email, keyToUse);
       setAnalysis((prev) => ({ ...prev, [email.id]: result }));
       setSelectedEmail(email);
+      setApiKey(keyToUse);
       setShowApiInput(false);
       Alert.alert('Analysis Complete', `Email analysis finished for: ${email.subject}`);
     } catch (error) {
@@ -99,7 +110,7 @@ export default function HomeScreen({ onLogout }) {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>🛡️ Phishing Detector</Text>
@@ -160,6 +171,15 @@ export default function HomeScreen({ onLogout }) {
           <Text style={styles.detailText}>{selectedEmail.subject}</Text>
           <Text style={styles.detailLabel}>Message preview</Text>
           <Text style={styles.bodyText}>{selectedEmail.body || selectedEmail.snippet || 'No message body available'}</Text>
+          {selectedSenderAnalysis && (
+            <View style={styles.senderDetailsBox}>
+              <Text style={styles.detailLabel}>Ocena nadawcy</Text>
+              <Text style={styles.analysisDetailText}>
+                {selectedSenderAnalysis.trustScore}% — {selectedSenderAnalysis.riskLevel === 'high' ? 'Wysokie ryzyko' : selectedSenderAnalysis.riskLevel === 'medium' ? 'Średnie ryzyko' : 'Niskie ryzyko'}
+              </Text>
+              <Text style={styles.analysisDetailText}>{selectedSenderAnalysis.warnings.join('; ')}</Text>
+            </View>
+          )}
           {analysis[selectedEmail.id] ? (
             <View style={styles.detailsAnalysisBox}>
               <Text style={styles.detailLabel}>AI Analysis Result</Text>
@@ -191,7 +211,6 @@ export default function HomeScreen({ onLogout }) {
         </View>
       ) : (
         <FlatList
-          scrollEnabled={false}
           data={emails}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -205,9 +224,10 @@ export default function HomeScreen({ onLogout }) {
             />
           )}
           style={styles.emailList}
+          contentContainerStyle={styles.emailListContent}
         />
       )}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -307,6 +327,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
+  emailListContent: {
+    paddingBottom: 40,
+  },
   emptyBox: {
     margin: 15,
     padding: 40,
@@ -355,6 +378,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  senderDetailsBox: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#eef2ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
   },
   analysisDetailText: {
     fontSize: 12,
