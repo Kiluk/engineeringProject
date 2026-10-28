@@ -8,8 +8,8 @@
   },
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
-    "web": "expo start --web",
+    "start": "node scripts/start.js",
+    "web": "node scripts/start.js --web",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "test": "node -r @babel/register tests/phishingDetector.test.js"

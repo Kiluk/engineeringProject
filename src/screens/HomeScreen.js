@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -20,6 +21,7 @@ export default function HomeScreen({ onLogout }) {
   const [apiKey, setApiKey] = useState('');
   const [showApiInput, setShowApiInput] = useState(true);
   const [analysis, setAnalysis] = useState({});
+  const [analysisError, setAnalysisError] = useState('');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const selectedSenderAnalysis = selectedEmail ? SenderAnalyzer.analyzeSender(selectedEmail.from) : null;
 
@@ -57,13 +59,19 @@ export default function HomeScreen({ onLogout }) {
   };
 
   const handleAnalyzeEmail = async (email) => {
+    setSelectedEmail(email);
+    setAnalysisError('');
     let keyToUse = apiKey;
     if (!keyToUse.trim()) {
       keyToUse = await EmailManager.loadSavedApiKey();
     }
 
     if (!keyToUse || !keyToUse.trim()) {
-      Alert.alert('Missing API Key', 'Please enter your Anthropic API key');
+      setAnalysisError('Missing API key. Enter and save your Anthropic API key first.');
+      return;
+    }
+    if (!/^[\x21-\x7E]+$/.test(keyToUse.trim())) {
+      setAnalysisError('Klucz API zawiera niedozwolone znaki. Zmień klucz i wklej ponownie wartość skopiowaną z Anthropic.');
       return;
     }
 
@@ -76,6 +84,7 @@ export default function HomeScreen({ onLogout }) {
       setShowApiInput(false);
       Alert.alert('Analysis Complete', `Email analysis finished for: ${email.subject}`);
     } catch (error) {
+      setAnalysisError(error.message || 'Failed to analyze email');
       Alert.alert('Error', error.message || 'Failed to analyze email');
     } finally {
       setAnalyzing(false);
@@ -91,9 +100,13 @@ export default function HomeScreen({ onLogout }) {
       Alert.alert('Missing API Key', 'Please enter your Anthropic API key');
       return;
     }
+    if (!/^[\x21-\x7E]+$/.test(apiKey.trim())) {
+      Alert.alert('Nieprawidłowy klucz API', 'Wklej ponownie klucz skopiowany z Anthropic. Klucz nie może zawierać polskich znaków ani spacji wewnątrz.');
+      return;
+    }
 
     try {
-      await EmailManager.saveApiKey(apiKey);
+      await EmailManager.saveApiKey(apiKey.trim());
       setShowApiInput(false);
       Alert.alert('Ready', 'API key saved. Select a message to analyze.');
     } catch (error) {
@@ -164,42 +177,52 @@ export default function HomeScreen({ onLogout }) {
 
       {selectedEmail && (
         <View style={styles.detailsSection}>
-          <Text style={styles.sectionTitle}>Selected Email</Text>
-          <Text style={styles.detailLabel}>From</Text>
-          <Text style={styles.detailText}>{selectedEmail.from}</Text>
-          <Text style={styles.detailLabel}>Subject</Text>
-          <Text style={styles.detailText}>{selectedEmail.subject}</Text>
-          <Text style={styles.detailLabel}>Message preview</Text>
-          <Text style={styles.bodyText}>{selectedEmail.body || selectedEmail.snippet || 'No message body available'}</Text>
-          {selectedSenderAnalysis && (
-            <View style={styles.senderDetailsBox}>
-              <Text style={styles.detailLabel}>Ocena nadawcy</Text>
-              <Text style={styles.analysisDetailText}>
-                {selectedSenderAnalysis.trustScore}% — {selectedSenderAnalysis.riskLevel === 'high' ? 'Wysokie ryzyko' : selectedSenderAnalysis.riskLevel === 'medium' ? 'Średnie ryzyko' : 'Niskie ryzyko'}
-              </Text>
-              <Text style={styles.analysisDetailText}>{selectedSenderAnalysis.warnings.join('; ')}</Text>
-            </View>
-          )}
-          {analysis[selectedEmail.id] ? (
-            <View style={styles.detailsAnalysisBox}>
-              <Text style={styles.detailLabel}>AI Analysis Result</Text>
-              <Text style={styles.analysisDetailText}>{analysis[selectedEmail.id].reason}</Text>
-              <Text style={styles.analysisDetailText}>
-                Verdict: {analysis[selectedEmail.id].isPhishing ? 'Phishing' : 'Safe'}
-              </Text>
-              <Text style={styles.analysisDetailText}>
-                Confidence: {(analysis[selectedEmail.id].confidence * 100).toFixed(0)}%
-              </Text>
-            </View>
-          ) : (
+          <ScrollView style={styles.detailsScrollView} nestedScrollEnabled>
+            <Text style={styles.sectionTitle}>Selected Email</Text>
+            <Text style={styles.detailLabel}>From</Text>
+            <Text style={styles.detailText}>{selectedEmail.from}</Text>
+            <Text style={styles.detailLabel}>Subject</Text>
+            <Text style={styles.detailText}>{selectedEmail.subject}</Text>
+            <Text style={styles.detailLabel}>Message preview</Text>
+            <Text style={styles.bodyText}>{selectedEmail.body || selectedEmail.snippet || 'No message body available'}</Text>
+            {selectedSenderAnalysis && (
+              <View style={styles.senderDetailsBox}>
+                <Text style={styles.detailLabel}>Ocena nadawcy</Text>
+                <Text style={styles.analysisDetailText}>
+                  {selectedSenderAnalysis.trustScore}% — {selectedSenderAnalysis.riskLevel === 'high' ? 'Wysokie ryzyko' : selectedSenderAnalysis.riskLevel === 'medium' ? 'Średnie ryzyko' : 'Niskie ryzyko'}
+                </Text>
+                <Text style={styles.analysisDetailText}>{selectedSenderAnalysis.warnings.join('; ')}</Text>
+              </View>
+            )}
+            {analysis[selectedEmail.id] && (
+              <View style={styles.detailsAnalysisBox}>
+                <Text style={styles.detailLabel}>AI Analysis Result</Text>
+                <Text style={styles.analysisDetailText}>{analysis[selectedEmail.id].reason}</Text>
+                <Text style={styles.analysisDetailText}>
+                  Verdict: {analysis[selectedEmail.id].isPhishing ? 'Phishing' : 'Safe'}
+                </Text>
+                <Text style={styles.analysisDetailText}>
+                  Confidence: {(analysis[selectedEmail.id].confidence * 100).toFixed(0)}%
+                </Text>
+              </View>
+            )}
             <TouchableOpacity
               style={[styles.button, analyzing && styles.buttonDisabled]}
               onPress={() => handleAnalyzeEmail(selectedEmail)}
               disabled={analyzing}
             >
-              {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Analyze Selected Email</Text>}
+              {analyzing ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {analysis[selectedEmail.id] ? 'Re-analyze Selected Email' : 'Analyze Selected Email'}
+                </Text>
+              )}
             </TouchableOpacity>
-          )}
+            {!!analysisError && (
+              <Text style={styles.analysisError}>{analysisError}</Text>
+            )}
+          </ScrollView>
         </View>
       )}
 
@@ -345,6 +368,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 15,
     marginBottom: 15,
     padding: 15,
+    maxHeight: '55%',
     backgroundColor: '#fff',
     borderRadius: 8,
     shadowColor: '#000',
@@ -352,6 +376,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
+  },
+  detailsScrollView: {
+    flex: 1,
+    minHeight: 0,
   },
   detailLabel: {
     fontSize: 13,
@@ -392,5 +420,10 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 4,
     lineHeight: 18,
+  },
+  analysisError: {
+    color: '#b91c1c',
+    fontSize: 12,
+    marginTop: 8,
   },
 });

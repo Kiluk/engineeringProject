@@ -6,7 +6,7 @@ let client = null;
 export const PhishingDetector = {
   setApiKey: (key) => {
     apiKey = key;
-    client = new Anthropic({ apiKey: key });
+    client = typeof document !== 'undefined' ? null : new Anthropic({ apiKey: key });
   },
 
   setClient: (mockClient) => {
@@ -20,6 +20,25 @@ export const PhishingDetector = {
   },
 
   detectPhishing: async (email) => {
+    if (typeof document !== 'undefined' && !client) {
+      let response;
+      try {
+        response = await fetch('http://127.0.0.1:3001/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey, email }),
+        });
+      } catch {
+        throw new Error('Nie można połączyć z lokalnym serwerem analizy. Uruchom aplikację poleceniem npm start.');
+      }
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || `Błąd serwera analizy (${response.status})`);
+      }
+      return result;
+    }
+
     if (!client) {
       throw new Error('API key not set. Call setApiKey() first.');
     }
